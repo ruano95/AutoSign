@@ -31,8 +31,8 @@ class MainActivity : AppCompatActivity() {
 
         val request = ClockingRequest(
             sessionInfo = SessionInfo(
-                user = "11859304K",
-                password = "Ust12345$"
+                user = BuildConfig.USER_NAME,
+                password = BuildConfig.USER_PASSWORD
             ),
             clientTime = java.text.SimpleDateFormat(
                 "yyyy-MM-dd'T'HH:mm:ss"

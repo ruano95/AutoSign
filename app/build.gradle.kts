@@ -1,3 +1,16 @@
+import java.util.Properties
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+
+val userName = localProperties.getProperty("USER_NAME") ?: ""
+val userPassword = localProperties.getProperty("USER_PASSWORD") ?: ""
+
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -10,8 +23,14 @@ android {
             minorApiLevel = 1
         }
     }
-
+    buildFeatures {
+        buildConfig = true
+        compose = true
+    }
     defaultConfig {
+        buildConfigField("String", "USER_NAME", "\"$userName\"")
+        buildConfigField("String", "USER_PASSWORD", "\"$userPassword\"")
+
         applicationId = "com.cyberfrog.AutoSign"
         minSdk = 23
         targetSdk = 36
@@ -34,9 +53,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    buildFeatures {
-        compose = true
-    }
+
 }
 
 dependencies {
