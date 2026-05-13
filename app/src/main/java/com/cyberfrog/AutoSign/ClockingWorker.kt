@@ -16,15 +16,20 @@ class ClockingWorker(
 
     override fun doWork(): Result {
 
+        val today = java.time.LocalDate.now().dayOfWeek
+
+        if (today == java.time.DayOfWeek.SATURDAY || today == java.time.DayOfWeek.SUNDAY) {
+            return Result.success()
+        }
+
         val request = ClockingRequest(
             sessionInfo = SessionInfo(
-                user = "11859304K",
-                password = "Ust12345$"
+                user = BuildConfig.USER_NAME,
+                password = BuildConfig.USER_PASSWORD
             ),
-            clientTime = SimpleDateFormat(
-                "yyyy-MM-dd'T'HH:mm:ss",
-                Locale.getDefault()
-            ).format(Date())
+            clientTime = java.text.SimpleDateFormat(
+                "yyyy-MM-dd'T'HH:mm:ss"
+            ).format(java.util.Date())
         )
 
         try {

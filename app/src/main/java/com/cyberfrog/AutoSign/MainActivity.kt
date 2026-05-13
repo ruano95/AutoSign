@@ -72,7 +72,7 @@ class MainActivity : AppCompatActivity() {
         val salida = PeriodicWorkRequestBuilder<ClockingWorker>(
             24, TimeUnit.HOURS
         )
-            .setInitialDelay(calcularDelay(18, 0), TimeUnit.MILLISECONDS)
+            .setInitialDelay(calcularDelay(18, 30), TimeUnit.MILLISECONDS)
             .build()
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
