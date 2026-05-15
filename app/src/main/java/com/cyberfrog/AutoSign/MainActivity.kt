@@ -66,13 +66,13 @@ class MainActivity : AppCompatActivity() {
         val entrada = PeriodicWorkRequestBuilder<ClockingWorker>(
             24, TimeUnit.HOURS
         )
-            .setInitialDelay(calcularDelay(9, 0), TimeUnit.MILLISECONDS)
+            .setInitialDelay(calcularDelayVariable(9, 0, 13), TimeUnit.MILLISECONDS)
             .build()
 
         val salida = PeriodicWorkRequestBuilder<ClockingWorker>(
             24, TimeUnit.HOURS
         )
-            .setInitialDelay(calcularDelay(18, 30), TimeUnit.MILLISECONDS)
+            .setInitialDelay(calcularDelayVariable(18, 30, 11), TimeUnit.MILLISECONDS)
             .build()
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
@@ -88,10 +88,17 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun calcularDelay(hour: Int, minute: Int): Long {
+    private fun calcularDelayVariable(hour: Int, minute: Int, variacionMinutos: Int): Long {
 
         val now = java.time.LocalDateTime.now()
-        var target = now.withHour(hour).withMinute(minute).withSecond(0)
+
+        val randomOffset = (-variacionMinutos..variacionMinutos).random()
+
+        var target = now
+            .withHour(hour)
+            .withMinute(minute)
+            .withSecond(0)
+            .plusMinutes(randomOffset.toLong())
 
         if (target.isBefore(now)) {
             target = target.plusDays(1)
