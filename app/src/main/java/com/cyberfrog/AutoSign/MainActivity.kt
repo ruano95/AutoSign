@@ -9,6 +9,7 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.util.concurrent.TimeUnit
+import kotlin.apply
 
 class MainActivity : AppCompatActivity() {
 
@@ -18,7 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: android.content.SharedPreferences
 
     private fun isAutoEnabled(): Boolean {
-        return prefs.getBoolean("auto_enabled", true)
+        return prefs.getBoolean("auto_enabled", false)
     }
 
     private fun setAutoEnabled(enabled: Boolean) {
@@ -42,6 +43,9 @@ class MainActivity : AppCompatActivity() {
 
         // 🔐 inicializar prefs (IMPORTANTE)
         prefs = getSharedPreferences("clocking_prefs", MODE_PRIVATE)
+        if (!prefs.contains("auto_enabled")) {
+            setAutoEnabled(false)
+        }
 
         // 📱 UI
         val button = findViewById<Button>(R.id.btnFichar)
@@ -52,6 +56,8 @@ class MainActivity : AppCompatActivity() {
         button.setOnClickListener {
             fichar(resultText)
         }
+        // 🟢 Mostrar resultados anteriores almacenados
+        loadClockings(resultText)
 
         // 🔁 toggle auto fichaje (ESTO ESTABA MAL COLOCADO ANTES)
         btnToggle.setOnClickListener {
@@ -62,9 +68,15 @@ class MainActivity : AppCompatActivity() {
 
             updateToggleUI(btnToggle, enabled)
         }
+        val autoEnabled = isAutoEnabled()
+        updateToggleUI(btnToggle, autoEnabled)
 
         // 🚀 programación inicial
-        programarFichajes()
+        if (autoEnabled) {
+            programarFichajes()
+        } else {
+            cancelarFichajes()
+        }
     }
 
     // =========================
@@ -91,10 +103,11 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     val body = response.body()
 
-                    resultText.text = if (body != null) {
-                        formatClockings(body)
+                    if (body != null) {
+                        saveClockings(body)
+                        loadClockings(resultText)
                     } else {
-                        "Sin respuesta"
+                        resultText.text = "Sin respuesta"
                     }
                 }
 
@@ -102,6 +115,70 @@ class MainActivity : AppCompatActivity() {
                     resultText.text = "ERROR:\n${t.message}"
                 }
             })
+    }
+
+    private fun saveClockings(body: Map<String, Any>) {
+
+        val data = body["data"] as? Map<*, *> ?: return
+        val list = data["recentClockings"] as? List<*> ?: return
+
+        val grouped = mutableMapOf<String, MutableList<String>>()
+
+        list.forEach { item ->
+
+            val row = item as? List<*> ?: return@forEach
+            val rawDate = row.getOrNull(0)?.toString() ?: return@forEach
+
+            if (rawDate.length < 16) return@forEach
+
+            val date = rawDate.substring(0, 10)
+            val time = rawDate.substring(11, 16)
+
+            grouped.getOrPut(date) { mutableListOf() }.add(time)
+        }
+
+        // ordenar horas
+        grouped.forEach { (_, times) ->
+            times.sort()
+        }
+
+        val json = com.google.gson.Gson().toJson(grouped)
+
+        prefs.edit()
+            .putString("clocking_data", json)
+            .apply()
+    }
+
+    private fun loadClockings(resultText: TextView) {
+
+        val raw = prefs.getString("clocking_data", null)
+
+        if (raw.isNullOrBlank()) {
+            resultText.text = "Sin datos"
+            return
+        }
+
+        val type = object : com.google.gson.reflect.TypeToken<Map<String, List<String>>>() {}.type
+        val data: Map<String, List<String>> =
+            com.google.gson.Gson().fromJson(raw, type)
+
+        val sorted = data.toSortedMap(compareByDescending { it })
+
+        val text = buildString {
+
+            sorted.forEach { (date, times) ->
+
+                append("${formatDate(date)}:\n")
+
+                times.sorted().forEach {
+                    append("$it\n")
+                }
+
+                append("\n")
+            }
+        }
+
+        resultText.text = text
     }
 
     // =========================
@@ -202,31 +279,27 @@ class MainActivity : AppCompatActivity() {
     // =========================
     private fun formatDate(date: String): String {
 
-        return try {
-            val parts = date.split("-")
-            val day = parts[2]
-            val month = parts[1]
+        val parts = date.split("-")
+        val day = parts[2]
+        val month = parts[1]
 
-            val monthName = when (month) {
-                "01" -> "enero"
-                "02" -> "febrero"
-                "03" -> "marzo"
-                "04" -> "abril"
-                "05" -> "mayo"
-                "06" -> "junio"
-                "07" -> "julio"
-                "08" -> "agosto"
-                "09" -> "septiembre"
-                "10" -> "octubre"
-                "11" -> "noviembre"
-                "12" -> "diciembre"
-                else -> month
-            }
-
-            "$day $monthName"
-        } catch (e: Exception) {
-            date
+        val monthName = when (month) {
+            "01" -> "enero"
+            "02" -> "febrero"
+            "03" -> "marzo"
+            "04" -> "abril"
+            "05" -> "mayo"
+            "06" -> "junio"
+            "07" -> "julio"
+            "08" -> "agosto"
+            "09" -> "septiembre"
+            "10" -> "octubre"
+            "11" -> "noviembre"
+            "12" -> "diciembre"
+            else -> month
         }
+
+        return "$day $monthName"
     }
 }
 
