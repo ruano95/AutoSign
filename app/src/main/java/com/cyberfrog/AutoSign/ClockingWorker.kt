@@ -3,25 +3,46 @@ package com.cyberfrog.AutoSign
 import android.content.Context
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.util.Date
 
 class ClockingWorker(
     context: Context,
-    params: WorkerParameters
-) : Worker(context, params) {
+    workerParams: WorkerParameters
+) : Worker(context, workerParams) {
 
     override fun doWork(): Result {
 
-        val today = java.time.LocalDate.now().dayOfWeek
+        // =========================
+        // 📅 Día actual
+        // =========================
+        val today = LocalDate.now().dayOfWeek
 
-        if (today == java.time.DayOfWeek.SATURDAY || today == java.time.DayOfWeek.SUNDAY) {
+        // =========================
+        // ⚙️ Preferencias (auto ON/OFF)
+        // =========================
+        val prefs = applicationContext.getSharedPreferences(
+            "clocking_prefs",
+            Context.MODE_PRIVATE
+        )
+
+        val enabled = prefs.getBoolean("auto_enabled", true)
+
+        if (!enabled) {
             return Result.success()
         }
 
+        // =========================
+        // 🚫 Bloqueo fines de semana
+        // =========================
+        if (today == DayOfWeek.SATURDAY || today == DayOfWeek.SUNDAY) {
+            return Result.success()
+        }
+
+        // =========================
+        // 🧾 Construcción request
+        // =========================
         val request = ClockingRequest(
             sessionInfo = SessionInfo(
                 user = BuildConfig.USER_NAME,
@@ -29,21 +50,33 @@ class ClockingWorker(
             ),
             clientTime = java.text.SimpleDateFormat(
                 "yyyy-MM-dd'T'HH:mm:ss"
-            ).format(java.util.Date())
+            ).format(Date())
         )
 
-        try {
+        return try {
+
+            // =========================
+            // 🌐 llamada síncrona (IMPORTANTE en Worker)
+            // =========================
             val response = RetrofitClient.api.fichar(request).execute()
 
-            return if (response.isSuccessful) {
+            if (response.isSuccessful) {
+
+                // 🔍 opcional: puedes loguear aquí respuesta
                 Result.success()
+
             } else {
+
+                // ❗ fallo HTTP (400/500/etc)
                 Result.retry()
             }
 
         } catch (e: Exception) {
+
             e.printStackTrace()
-            return Result.retry()
+
+            // 🔁 fallo de red / parseo
+            Result.retry()
         }
     }
 }

@@ -12,21 +12,64 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
+    // =========================
+    // 🔐 PREFERENCIAS (estado auto ON/OFF)
+    // =========================
+    private lateinit var prefs: android.content.SharedPreferences
+
+    private fun isAutoEnabled(): Boolean {
+        return prefs.getBoolean("auto_enabled", true)
+    }
+
+    private fun setAutoEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("auto_enabled", enabled).apply()
+    }
+
+    // =========================
+    // 🛑 CANCELAR WORKERS
+    // =========================
+    private fun cancelarFichajes() {
+        WorkManager.getInstance(this).cancelUniqueWork("entrada")
+        WorkManager.getInstance(this).cancelUniqueWork("salida")
+    }
+
+    // =========================
+    // 🚀 ON CREATE (ENTRY POINT UI)
+    // =========================
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContentView(R.layout.activity_main)
 
+        // 🔐 inicializar prefs (IMPORTANTE)
+        prefs = getSharedPreferences("clocking_prefs", MODE_PRIVATE)
+
+        // 📱 UI
         val button = findViewById<Button>(R.id.btnFichar)
         val resultText = findViewById<TextView>(R.id.txtResultado)
+        val btnToggle = findViewById<Button>(R.id.btnToggleAuto)
 
+        // 🟢 botón fichar manual
         button.setOnClickListener {
             fichar(resultText)
         }
 
+        // 🔁 toggle auto fichaje (ESTO ESTABA MAL COLOCADO ANTES)
+        btnToggle.setOnClickListener {
+            val enabled = !isAutoEnabled()
+            setAutoEnabled(enabled)
+
+            if (enabled) programarFichajes() else cancelarFichajes()
+
+            updateToggleUI(btnToggle, enabled)
+        }
+
+        // 🚀 programación inicial
         programarFichajes()
     }
 
+    // =========================
+    // 🧾 FICHAR MANUAL
+    // =========================
     private fun fichar(resultText: TextView) {
 
         val request = ClockingRequest(
@@ -48,10 +91,10 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     val body = response.body()
 
-                    if (body != null) {
-                        resultText.text = formatClockings(body)
+                    resultText.text = if (body != null) {
+                        formatClockings(body)
                     } else {
-                        resultText.text = "Sin respuesta"
+                        "Sin respuesta"
                     }
                 }
 
@@ -61,6 +104,9 @@ class MainActivity : AppCompatActivity() {
             })
     }
 
+    // =========================
+    // ⏱ PROGRAMAR FICHAJES AUTOMÁTICOS
+    // =========================
     private fun programarFichajes() {
 
         val entrada = PeriodicWorkRequestBuilder<ClockingWorker>(
@@ -88,6 +134,9 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    // =========================
+    // 🎲 DELAY CON VARIACIÓN
+    // =========================
     private fun calcularDelayVariable(hour: Int, minute: Int, variacionMinutos: Int): Long {
 
         val now = java.time.LocalDateTime.now()
@@ -107,12 +156,14 @@ class MainActivity : AppCompatActivity() {
         return java.time.Duration.between(now, target).toMillis()
     }
 
+    // =========================
+    // 📊 FORMATEO DE RESPUESTA
+    // =========================
     private fun formatClockings(body: Map<String, Any>): String {
 
         val data = body["data"] as? Map<*, *> ?: return "Sin datos"
         val list = data["recentClockings"] as? List<*> ?: return "Sin fichajes"
 
-        // Agrupar por día
         val grouped = list.mapNotNull { item: Any? ->
 
             val row = item as? List<*> ?: return@mapNotNull null
@@ -137,7 +188,6 @@ class MainActivity : AppCompatActivity() {
 
                 append("📅 $prettyDate\n")
 
-                // 👉 ORDENAR HORAS AQUÍ
                 times.sorted().forEach {
                     append("• $it\n")
                 }
@@ -147,6 +197,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // =========================
+    // 📅 FORMATEO FECHA
+    // =========================
     private fun formatDate(date: String): String {
 
         return try {
@@ -175,7 +228,19 @@ class MainActivity : AppCompatActivity() {
             date
         }
     }
+}
 
+// =========================
+// 📅 COLOR DINÁMICO DEL BOTÓN DE AUTO ON/OFF
+// =========================
+private fun updateToggleUI(button: Button, enabled: Boolean) {
+    button.text = if (enabled) "Auto: ON" else "Auto: OFF"
 
+    val color = if (enabled) {
+        android.graphics.Color.parseColor("#4CAF50") // verde
+    } else {
+        android.graphics.Color.parseColor("#F44336") // rojo
+    }
 
+    button.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
 }
